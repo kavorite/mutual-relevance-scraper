@@ -67,6 +67,8 @@ def samples(negativeSkew = 0.5, n=float('inf')):
 
 def annotations(n=10000):
     for negative, pair in samples():
+        # TODO: Figure out what in the sampling stack keeps givin us empty
+        # reply tuples
         head, tail = pair
         call = sanitize(head.body)
         response = sanitize(tail.body)
