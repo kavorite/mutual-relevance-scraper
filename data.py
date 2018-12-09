@@ -1,6 +1,5 @@
 import praw
 import random
-import emot
 import regex as re
 import itertools as it
 from os import environ as env
@@ -13,33 +12,7 @@ r = praw.Reddit(client_id=env["REDDIT_CLIENT_ID"],
 
 PARTITION = '||'
 
-URI_RGX = re.compile("(\w+:/)?[/a-zA-Z0-9.]+")
-PUNCT_RGX = re.compile('\p{P}')
-
 def sanitize(s: str):
-    # TODO: Better URI tokenization, handle emotes
-    # PUNCT_RGX.sub(s, ' \\1 ')
-    # def tokens():
-    #     for t in s.split():
-    #         if URI_RGX.match(s):
-    #             yield s
-    #         else:
-    #             cq = ''
-    #             for c in s:
-    #                 if ud.category(c)[0] == 'P':
-    #                     yield cq
-    #                     yield c
-    #                 cq += c
-    #
-    #     splitp = lambda c: ud.category(c) == 'P' && c
-    #     for t in s.split():
-    #         t = list(t)
-    #         if ud.category(t[0])[0] == 'P':
-    #             yield t.pop(0)
-    #         if ud.category(t[-1])[0] == 'P':
-    #             yield t.pop(-1)
-    #         yield ''.join(t)
-    # return ' '.join(tokens())
     s = ''.join(c if ud.category(c)[0] != 'P' else f' {c} ' for c in s)
     return ' '.join(t for t in s.strip().split() if t != PARTITION)
 
@@ -90,7 +63,7 @@ def randomComments(poolSize=50, maxDepth=2, n=float('inf')):
         yield from cq
 
 # negative sampling — build tuples of unrelated comments
-def negativeSamples(rnd=randomComments(3), n=float('inf')):
+def negativeSamples(rnd=randomComments(), n=float('inf')):
     i = 0
     while i < n:
         head, d_head = next(rnd)
@@ -103,6 +76,7 @@ def negativeSamples(rnd=randomComments(3), n=float('inf')):
 
 # aggregate samples with the proportion of negative sampling given in
 # negativeSkew, and return them for a count of n
+REMOVED = {'[removed]', '[deleted]'}
 def samples(negativeSkew = 0.5, n=float('inf')):
     negatives = 0
     total = 0
@@ -114,26 +88,79 @@ def samples(negativeSkew = 0.5, n=float('inf')):
         total += 1
         negatives += 1 if negative else 0
         sampler = neg if negative else pos
+        head, tail = next(sampler)
+        if head.body in REMOVED or tail.body in REMOVED:
+            continue
         yield (negative, next(sampler))
 
-def annotations(n=12500):
+def annotations(startbytes=0, bytes=(120<<20), progress=lambda x: None, encoding='utf-8'):
+    bytelength = startbytes
     for negative, pair in samples():
         head, tail = pair
         call = sanitize(head.body)
         response = sanitize(tail.body)
         label = 'negative' if negative else 'positive'
         yield f'__label__{label} {call} {PARTITION} {response}'
+        try:
+            read = len(call.encode(encoding)) + len(response.encode(encoding))
+        except UnicodeEncodeError:
+            read = len(call) + len(response)
+        bytelength += read
+        got = bytelength / bytes
+        progress(got)
+        if got > 1:
+            break
 
 if __name__ == '__main__':
-    from sys import argv, stdout
-    if len(argv) > 1:
-        data = annotations(int(argv[1]))
-    else:
-        data = annotations()
+    from humanfriendly import parse_size
+    from sys import argv, stdout, stderr
+    from argparse import ArgumentParser
+    from os import SEEK_END
+    desc = ('Retrieve fastText supervised mutual-relevance'
+            ' data from various subreddits')
+    parser = ArgumentParser(description=desc)
+    parser.add_argument(
+        '--opath',
+        help='Path to the training file',
+        required=False)
+    parser.add_argument(
+        '--length',
+        help='Size of the data-set to be retrieved (KB, G, etc.)',
+        default='120M',
+        required=False)
+    parser.add_argument(
+        '--silent',
+        default=False,
+        type=bool)
+    parser.add_argument(
+        '--encoding',
+        default='utf-8')
 
-    data = (f'{ln}\r\n' for ln in data)
-    try:
-        for ln in data:
-            stdout.write(ln)
-    except KeyboardInterrupt:
-        pass
+    parsed = parser.parse_args()
+    parsed.length = parse_size(parsed.length)
+
+    spinner_index = 0
+    SPINNER = '⣾⣽⣻⢿⡿⣟⣯⣷' if parser.encoding.find('utf-') >= 0 else '.oO@*'
+    def progress(x):
+        global spinner_index
+        c = SPINNER[spinner_index]
+        if not parsed.silent:
+            bar = '#' * round(x * 40) + ' ' * (40 - round(x * 40))
+            stderr.write(f'{x*100:02.02f}% [{bar}] {c}\r')
+        spinner_index += 1
+        spinner_index %= len(SPINNER)
+
+    startbytes = 0
+    ostream = stdout.buffer if parsed.opath is None else open(opath, 'w+')
+    with ostream as o:
+        if o is not stdout:
+            o.seek(0, SEEK_END)
+            startbytes = o.tell()
+
+        data = annotations(startbytes, parsed.length, progress, parsed.encoding)
+        data = (f'{ln}\r\n' for ln in data)
+        try:
+            for ln in data:
+                o.write(ln.encode(parsed.encoding))
+        except KeyboardInterrupt:
+            pass
