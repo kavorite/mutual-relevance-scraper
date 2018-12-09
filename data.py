@@ -151,7 +151,7 @@ if __name__ == '__main__':
         spinner_index %= len(SPINNER)
 
     startbytes = 0
-    ostream = stdout.buffer if parsed.opath is None else open(parsed.opath, 'w+')
+    ostream = stdout.buffer if parsed.opath is None else open(parsed.opath, 'wb+')
     with ostream as o:
         if o is not stdout.buffer:
             o.seek(0, SEEK_END)
@@ -161,6 +161,6 @@ if __name__ == '__main__':
         data = (f'{ln}\r\n' for ln in data)
         try:
             for ln in data:
-                o.write(ln.encode(parsed.encoding))
+                o.write(parsed.encoding)
         except KeyboardInterrupt:
             pass
