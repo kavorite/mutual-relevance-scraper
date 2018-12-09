@@ -48,7 +48,7 @@ def positiveSamples(n=float('inf'), maxDepth=3):
         i += 1
 
 # generate random comments
-def randomComments(poolSize=50, maxDepth=2, n=float('inf')):
+def randomComments(poolSize=300, maxDepth=2, n=float('inf')):
     i = 0
     while i < n:
         cq = deque()
@@ -140,7 +140,7 @@ if __name__ == '__main__':
     parsed.length = parse_size(parsed.length)
 
     spinner_index = 0
-    SPINNER = '⣾⣽⣻⢿⡿⣟⣯⣷' if parser.encoding.find('utf-') >= 0 else '.oO@*'
+    SPINNER = '⣾⣽⣻⢿⡿⣟⣯⣷' if parsed.encoding.find('utf-') >= 0 else '.oO@*'
     def progress(x):
         global spinner_index
         c = SPINNER[spinner_index]
@@ -153,7 +153,7 @@ if __name__ == '__main__':
     startbytes = 0
     ostream = stdout.buffer if parsed.opath is None else open(opath, 'w+')
     with ostream as o:
-        if o is not stdout:
+        if o is not stdout.buffer:
             o.seek(0, SEEK_END)
             startbytes = o.tell()
 
