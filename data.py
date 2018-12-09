@@ -1,5 +1,6 @@
 import praw
 import random
+import emot
 import regex as re
 import itertools as it
 from os import environ as env
@@ -81,7 +82,7 @@ def randomComments(poolSize=50, maxDepth=2, n=float('inf')):
         while len(cq) < poolSize:
             post = randomSubmission()
             added = len(cq)
-            pairs = tuple(depthPairs(post, poolSize//3, maxDepth, True))
+            pairs = depthPairs(post, poolSize//3, maxDepth, True)
             cq.extend(pairs)
             added = len(cq) - added
             i += added
