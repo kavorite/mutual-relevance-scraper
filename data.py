@@ -151,7 +151,7 @@ if __name__ == '__main__':
         spinner_index %= len(SPINNER)
 
     startbytes = 0
-    ostream = stdout.buffer if parsed.opath is None else open(parsed.opath, 'wb+')
+    ostream = stdout.buffer if parsed.opath is None else open(parsed.opath, 'wb')
     with ostream as o:
         if o is not stdout.buffer:
             o.seek(0, SEEK_END)
