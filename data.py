@@ -16,50 +16,55 @@ URI_RGX = re.compile("(\w+:/)?[/a-zA-Z0-9.]+")
 PUNCT_RGX = re.compile('\p{P}')
 
 def sanitize(s: str):
-#    TODO: Better URI tokenization
-#    PUNCT_RGX.sub(s, ' \\1 ')
-#    def tokens():
-#        for t in s.split():
-#            if URI_RGX.match(s):
-#                yield s
-#            else:
-#                cq = ''
-#                for c in s:
-#                    if ud.category(c)[0] == 'P':
-#                        yield cq
-#                        yield c
-#                    cq += c
-#
-#        splitp = lambda c: ud.category(c) == 'P' && c
-#        for t in s.split():
-#            t = list(t)
-#            if ud.category(t[0])[0] == 'P':
-#                yield t.pop(0)
-#            if ud.category(t[-1])[0] == 'P':
-#                yield t.pop(-1)
-#            yield ''.join(t)
-#    return ' '.join(tokens())
+    # TODO: Better URI tokenization, handle emotes
+    # PUNCT_RGX.sub(s, ' \\1 ')
+    # def tokens():
+    #     for t in s.split():
+    #         if URI_RGX.match(s):
+    #             yield s
+    #         else:
+    #             cq = ''
+    #             for c in s:
+    #                 if ud.category(c)[0] == 'P':
+    #                     yield cq
+    #                     yield c
+    #                 cq += c
+    #
+    #     splitp = lambda c: ud.category(c) == 'P' && c
+    #     for t in s.split():
+    #         t = list(t)
+    #         if ud.category(t[0])[0] == 'P':
+    #             yield t.pop(0)
+    #         if ud.category(t[-1])[0] == 'P':
+    #             yield t.pop(-1)
+    #         yield ''.join(t)
+    # return ' '.join(tokens())
     s = ''.join(c if ud.category(c)[0] != 'P' else f' {c} ' for c in s)
     return ' '.join(t for t in s.strip().split() if t != PARTITION)
 
 def randomSubmission():
-    return r.subreddit('all').random()
+    return r.subreddit('random').random()
 
-def depthPairs(submission, breadthFirst=True):
-    submission.comments.replace_more(limit=None)
+def depthPairs(submission, n=float('inf'), maxDepth=float('inf'), breadthFirst=True):
+    limit = None if n == float('inf') else n
+    submission.comments.replace_more(limit=n)
     cq = deque(zip(submission.comments[:], it.repeat(1)))
+    i = 0
     while cq:
         comment, depth = cq.popleft()
         enqueue = cq.extend if breadthFirst else cq.extendleft
-        enqueue(zip(comment.replies, it.repeat(depth+1)))
         yield (comment, depth)
+        i += 1
+        if depth == maxDepth or i == n:
+            break
+        enqueue(zip(comment.replies, it.repeat(depth+1)))
 
-def positiveSamples(n=float('inf')):
+def positiveSamples(n=float('inf'), maxDepth=3):
     i = 0
     while i < n:
         submission = randomSubmission()
         previous = None
-        for tail, d_tail in depthPairs(submission, False):
+        for tail, d_tail in depthPairs(submission, n, maxDepth, False):
             if previous is None:
                 previous = (tail, d_tail)
                 continue
@@ -68,28 +73,35 @@ def positiveSamples(n=float('inf')):
                 yield (head, tail)
         i += 1
 
-# return a random comment and its depth
-def randomComment(maxDepth=1):
-    submission = randomSubmission()
-    pairs = []
-    while len(pairs) < 1:
-        pairs = [(comment, depth)
-                 for (comment, depth) in depthPairs(submission, True)
-                 if depth <= maxDepth]
-    return random.choice(pairs)
-
-# negative sampling — build tuples of unrelated comments
-def negativeSamples(n=float('inf')):
+# generate random comments
+def randomComments(poolSize=50, maxDepth=2, n=float('inf')):
     i = 0
     while i < n:
-        head, d_head = randomComment()
-        tail, d_tail = randomComment()
+        cq = deque()
+        while len(cq) < poolSize:
+            post = randomSubmission()
+            added = len(cq)
+            pairs = tuple(depthPairs(post, poolSize//3, maxDepth, True))
+            cq.extend(pairs)
+            added = len(cq) - added
+            i += added
+        random.shuffle(cq)
+        yield from cq
+
+# negative sampling — build tuples of unrelated comments
+def negativeSamples(rnd=randomComments(3), n=float('inf')):
+    i = 0
+    while i < n:
+        head, d_head = next(rnd)
+        tail, d_tail = next(rnd)
         if d_head < d_tail:
             # swap 'em
             head, tail = tail, head
         yield (head, tail)
         i += 1
 
+# aggregate samples with the proportion of negative sampling given in
+# negativeSkew, and return them for a count of n
 def samples(negativeSkew = 0.5, n=float('inf')):
     negatives = 0
     total = 0
@@ -105,8 +117,6 @@ def samples(negativeSkew = 0.5, n=float('inf')):
 
 def annotations(n=12500):
     for negative, pair in samples():
-        # TODO: Figure out what in the sampling stack keeps givin us empty
-        # reply tuples
         head, tail = pair
         call = sanitize(head.body)
         response = sanitize(tail.body)
