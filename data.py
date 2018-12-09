@@ -17,7 +17,7 @@ def sanitize(s: str):
     return ' '.join(t for t in s.strip().split() if t != PARTITION)
 
 def randomSubmission():
-    return r.subreddit('random').random()
+    return r.subreddit('all').random()
 
 def depthPairs(submission, n=float('inf'), maxDepth=float('inf'), breadthFirst=True):
     limit = None if n == float('inf') else n
