@@ -146,7 +146,7 @@ if __name__ == '__main__':
         c = SPINNER[spinner_index]
         if not parsed.silent:
             bar = '#' * round(x * 40) + ' ' * (40 - round(x * 40))
-            stderr.write(f'{x*100:02.02f}% [{bar}] {c}\r')
+            stderr.write(f'{x*100:20.02f}% [{bar}] {c}\r')
         spinner_index += 1
         spinner_index %= len(SPINNER)
 
