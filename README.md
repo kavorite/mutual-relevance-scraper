@@ -7,8 +7,8 @@ run like so:
 ```
 $ python data.py --length 0.1G --encoding utf-8 -o annotations.txt
 ```
-**note:** *while it is possible to redirect `stdout`, using `-o` allows data.py*
-*to remember where it left off and account for progress accordingly.*
+**note:** *while it is possible to redirect `stdout`, using `--opath` allows*
+*data.py to remember where it left off and account for progress accordingly.*
 
 - `data.py` — print supervised fastText annotations to stdout
 
