@@ -161,6 +161,6 @@ if __name__ == '__main__':
         data = (f'{ln}\r\n' for ln in data)
         try:
             for ln in data:
-                o.write(parsed.encoding)
+                o.write(ln.encode(parsed.encoding))
         except KeyboardInterrupt:
             pass
